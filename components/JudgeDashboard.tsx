@@ -34,6 +34,12 @@ const JudgeDashboard: React.FC<JudgeDashboardProps> = ({ judge, projects, criter
     return [toScore, scored];
   }, [projects, scoresByProjectId]);
 
+  const handleDeleteScore = (scoreId: string) => {
+    if (window.confirm('Are you sure you want to delete this evaluation? This action cannot be undone.')) {
+        onScoreDelete(scoreId);
+    }
+  };
+
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -103,7 +109,7 @@ const JudgeDashboard: React.FC<JudgeDashboardProps> = ({ judge, projects, criter
                         onClick={() => {
                             const scoreToDelete = scoresByProjectId.get(project.id);
                             if (scoreToDelete) {
-                                onScoreDelete(scoreToDelete.id);
+                                handleDeleteScore(scoreToDelete.id);
                             }
                         }}
                         className="p-2 rounded-md bg-white border border-gray-300 text-gray-500 hover:bg-red-100 hover:text-red-600 hover:border-red-200 transition-colors"

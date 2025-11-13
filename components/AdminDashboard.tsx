@@ -69,6 +69,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ projects, judges, crite
         }
     };
 
+    const handleDeleteJudge = (judgeId: string) => {
+        if (window.confirm('Are you sure you want to delete this judge? This will also delete all their scores and cannot be undone.')) {
+            deleteJudge(judgeId);
+        }
+    };
+
+    const handleDeleteCriterion = (criterionId: string) => {
+        if (window.confirm('Are you sure you want to delete this criterion? This could affect existing scores.')) {
+            deleteCriterion(criterionId);
+        }
+    };
+
     const handleOpenJudgeModal = (judge: Judge | null) => {
         setEditingJudge(judge);
         setIsJudgeModalOpen(true);
@@ -269,7 +281,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ projects, judges, crite
                                             <EditIcon className="w-4 h-4" />
                                         </button>
                                         <button
-                                            onClick={() => deleteJudge(j.id)}
+                                            onClick={() => handleDeleteJudge(j.id)}
                                             className="p-2 rounded-md bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-700 transition-colors"
                                             aria-label="Delete judge"
                                         >
@@ -318,7 +330,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ projects, judges, crite
                                                     <EditIcon className="w-4 h-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => deleteCriterion(c.id)}
+                                                    onClick={() => handleDeleteCriterion(c.id)}
                                                     className="p-2 rounded-md bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-700 transition-colors"
                                                     aria-label="Delete criterion"
                                                 >

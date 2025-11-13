@@ -5,14 +5,11 @@ import LoginScreen from './components/LoginScreen';
 import AdminDashboard from './components/AdminDashboard';
 import JudgeDashboard from './components/JudgeDashboard';
 import Header from './components/Header';
-import { MOCK_PROJECTS, MOCK_JUDGES, MOCK_CRITERIA, MOCK_SCORES } from './data/mockData';
-
 
 function App() {
   const [user, setUser] = useState<{ role: UserRole; id?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [backendError, setBackendError] = useState<string | null>(null);
-
+  
   const [projects, setProjects] = useState<Project[]>([]);
   const [judges, setJudges] = useState<Judge[]>([]);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
@@ -21,210 +18,77 @@ function App() {
   useEffect(() => {
     // Load initial data from our "database" when the app starts
     const fetchData = async () => {
-        try {
-            const data = await dbService.getAllData();
-            setProjects(data.projects);
-            setJudges(data.judges);
-            setCriteria(data.criteria);
-            setScores(data.scores);
-            setBackendError(null);
-        } catch (error) {
-            console.error("Failed to connect to backend:", error);
-            setBackendError("Could not connect to the backend server. The application is running in offline mode with mock data. Please run 'npm install' and 'node server.js' in the 'backend' directory to enable full functionality.");
-            // Fallback to mock data
-            setProjects(MOCK_PROJECTS);
-            setJudges(MOCK_JUDGES);
-            setCriteria(MOCK_CRITERIA);
-            setScores(MOCK_SCORES);
-        } finally {
-            setIsLoading(false);
-        }
+        const data = await dbService.getAllData();
+        setProjects(data.projects);
+        setJudges(data.judges);
+        setCriteria(data.criteria);
+        setScores(data.scores);
+        setIsLoading(false);
     };
     fetchData();
   }, []);
 
-  const handleApiError = (error: unknown, context: string) => {
-    console.error(context, error);
-    if (!backendError) {
-        setBackendError("Connection to server lost. Now in offline mode. Please ensure the backend is running and refresh the page to reconnect.");
-    }
-  };
 
   // --- Admin Handlers ---
   const addProjects = async (newProjectsData: Omit<Project, 'id'>[]) => {
-      if (backendError) {
-        const createdProjects = newProjectsData.map((p, i) => ({ ...p, id: `p_local_${Date.now()}_${i}` } as Project));
-        setProjects(prev => [...prev, ...createdProjects]);
-        return;
-      }
-      try {
-        const createdProjects = await dbService.createProjects(newProjectsData);
-        setProjects(prev => [...prev, ...createdProjects]);
-      } catch (error) {
-          handleApiError(error, 'Failed to add projects:');
-      }
+      const createdProjects = await dbService.createProjects(newProjectsData);
+      setProjects(prev => [...prev, ...createdProjects]);
   };
   const editProject = async (updatedProject: Project) => {
-      if (backendError) {
-        setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
-        return;
-      }
-      try {
-        const savedProject = await dbService.updateProject(updatedProject);
-        setProjects(prev => prev.map(p => p.id === savedProject.id ? savedProject : p));
-      } catch (error) {
-        handleApiError(error, `Failed to update project ${updatedProject.id}:`);
-      }
+      const savedProject = await dbService.updateProject(updatedProject);
+      setProjects(prev => prev.map(p => p.id === savedProject.id ? savedProject : p));
   };
   const deleteProject = async (projectId: string) => {
-    if (!window.confirm('Are you sure you want to delete this project? This will also delete all associated scores and cannot be undone.')) {
-        return;
-    }
-    if (backendError) {
-        setProjects(prev => prev.filter(p => p.id !== projectId));
-        setScores(prev => prev.filter(s => s.projectId !== projectId));
-        return;
-    }
-    try {
-        await dbService.deleteProject(projectId);
-        setProjects(prev => prev.filter(p => p.id !== projectId));
-        setScores(prev => prev.filter(s => s.projectId !== projectId));
-    } catch (error) {
-        handleApiError(error, `Failed to delete project ${projectId}:`);
-    }
+    await dbService.deleteProject(projectId);
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    setScores(prev => prev.filter(s => s.projectId !== projectId));
   };
 
   const addJudge = async (newJudgeData: Omit<Judge, 'id'>) => {
-    if (backendError) {
-        const newJudge = { ...newJudgeData, id: `j_local_${Date.now()}`};
-        setJudges(prev => [...prev, newJudge]);
-        return newJudge;
-    }
-    try {
-        const newJudge = await dbService.createJudge(newJudgeData);
-        setJudges(prev => [...prev, newJudge]);
-        return newJudge;
-    } catch(error) {
-        handleApiError(error, 'Failed to add judge:');
-        // Return a temporary judge object so the UI can proceed without crashing.
-        return { ...newJudgeData, id: `j_temp_${Date.now()}`};
-    }
+    const newJudge = await dbService.createJudge(newJudgeData);
+    setJudges(prev => [...prev, newJudge]);
+    return newJudge;
   };
   const editJudge = async (updatedJudge: Judge) => {
-      if (backendError) {
-        setJudges(prev => prev.map(j => j.id === updatedJudge.id ? updatedJudge : j));
-        return;
-      }
-      try {
-        const savedJudge = await dbService.updateJudge(updatedJudge);
-        setJudges(prev => prev.map(j => j.id === savedJudge.id ? savedJudge : j));
-      } catch (error) {
-          handleApiError(error, `Failed to update judge ${updatedJudge.id}:`);
-      }
+      const savedJudge = await dbService.updateJudge(updatedJudge);
+      setJudges(prev => prev.map(j => j.id === savedJudge.id ? savedJudge : j));
   };
   const deleteJudge = async (judgeId: string) => {
-    if (!window.confirm('Are you sure you want to delete this judge? This will also delete all their scores and cannot be undone.')) {
-        return;
-    }
-    if (backendError) {
-        setJudges(prev => prev.filter(j => j.id !== judgeId));
-        setScores(prev => prev.filter(s => s.judgeId !== judgeId));
-        return;
-    }
-    try {
-        await dbService.deleteJudge(judgeId);
-        setJudges(prev => prev.filter(j => j.id !== judgeId));
-        setScores(prev => prev.filter(s => s.judgeId !== judgeId));
-    } catch (error) {
-        handleApiError(error, `Failed to delete judge ${judgeId}:`);
-    }
+    await dbService.deleteJudge(judgeId);
+    setJudges(prev => prev.filter(j => j.id !== judgeId));
+    setScores(prev => prev.filter(s => s.judgeId !== judgeId));
   };
 
   const addCriterion = async (newCriterionData: Omit<Criterion, 'id'>) => {
-      if (backendError) {
-          const newCriterion = { ...newCriterionData, id: `c_local_${Date.now()}`};
-          setCriteria(prev => [...prev, newCriterion]);
-          return;
-      }
-      try {
-        const newCriterion = await dbService.createCriterion(newCriterionData);
-        setCriteria(prev => [...prev, newCriterion]);
-      } catch(error) {
-          handleApiError(error, 'Failed to add criterion:');
-      }
+      const newCriterion = await dbService.createCriterion(newCriterionData);
+      setCriteria(prev => [...prev, newCriterion]);
   };
   const editCriterion = async (updatedCriterion: Criterion) => {
-      if (backendError) {
-          setCriteria(prev => prev.map(c => c.id === updatedCriterion.id ? updatedCriterion : c));
-          return;
-      }
-      try {
-        const savedCriterion = await dbService.updateCriterion(updatedCriterion);
-        setCriteria(prev => prev.map(c => c.id === savedCriterion.id ? savedCriterion : c));
-      } catch (error) {
-        handleApiError(error, `Failed to update criterion ${updatedCriterion.id}:`);
-      }
+      const savedCriterion = await dbService.updateCriterion(updatedCriterion);
+      setCriteria(prev => prev.map(c => c.id === savedCriterion.id ? savedCriterion : c));
   };
   const deleteCriterion = async (criterionId: string) => {
-     if (!window.confirm('Are you sure you want to delete this criterion? This could affect existing scores.')) {
-        return;
-     }
-    if (backendError) {
-        setCriteria(prev => prev.filter(c => c.id !== criterionId));
-        return;
-    }
-    try {
-        await dbService.deleteCriterion(criterionId);
-        setCriteria(prev => prev.filter(c => c.id !== criterionId));
-    } catch(error) {
-        handleApiError(error, `Failed to delete criterion ${criterionId}:`);
-    }
+    await dbService.deleteCriterion(criterionId);
+    setCriteria(prev => prev.filter(c => c.id !== criterionId));
   };
 
   // --- Judge Handler ---
   const addOrUpdateScore = async (newScore: Score) => {
-    if (backendError) {
-        setScores(prev => {
-            const index = prev.findIndex(s => s.id === newScore.id);
-            if (index > -1) {
-                const updatedScores = [...prev];
-                updatedScores[index] = newScore;
-                return updatedScores;
-            }
-            return [...prev, newScore];
-        });
-        return;
-    }
-    try {
-        const savedScore = await dbService.createOrUpdateScore(newScore);
-        setScores(prev => {
-            const index = prev.findIndex(s => s.id === savedScore.id);
-            if (index > -1) {
-                const updatedScores = [...prev];
-                updatedScores[index] = savedScore;
-                return updatedScores;
-            }
-            return [...prev, savedScore];
-        });
-    } catch(error) {
-        handleApiError(error, `Failed to save score for project ${newScore.projectId}:`);
-    }
+    const savedScore = await dbService.createOrUpdateScore(newScore);
+    setScores(prev => {
+        const index = prev.findIndex(s => s.id === savedScore.id);
+        if (index > -1) {
+            const updatedScores = [...prev];
+            updatedScores[index] = savedScore;
+            return updatedScores;
+        }
+        return [...prev, savedScore];
+    });
   };
   
   const deleteScore = async (scoreId: string) => {
-    if (!window.confirm('Are you sure you want to delete this evaluation? This action cannot be undone.')) {
-        return;
-    }
-    if (backendError) {
-        setScores(prev => prev.filter(s => s.id !== scoreId));
-        return;
-    }
-    try {
-        await dbService.deleteScore(scoreId);
-        setScores(prev => prev.filter(s => s.id !== scoreId));
-    } catch(error) {
-        handleApiError(error, `Failed to delete score ${scoreId}:`);
-    }
+    await dbService.deleteScore(scoreId);
+    setScores(prev => prev.filter(s => s.id !== scoreId));
   };
 
   const handleAdminLogin = () => setUser({ role: UserRole.ADMIN });
@@ -246,6 +110,9 @@ function App() {
     }
     const currentJudge = judges.find(j => j.id === user.id);
     if (!currentJudge) {
+        // This could happen if a judge was deleted while they were logged in.
+        // Log them out gracefully.
+        handleLogout();
         return null;
     }
     const judgeProjects = projects.filter(p => currentJudge.tracks.includes(p.track as Track));
@@ -282,23 +149,7 @@ function App() {
         />;
       case UserRole.JUDGE:
         if (!judgeData) {
-            // This can happen in offline mode if a new judge logs in and then refreshes
-            const tempJudge = judges.find(j => j.id === user.id);
-            if (tempJudge) {
-                // If we can find the judge in state, let's try to render with what we have
-                const judgeProjects = projects.filter(p => tempJudge.tracks.includes(p.track as Track));
-                const judgeScores = scores.filter(s => s.judgeId === tempJudge.id);
-                return <JudgeDashboard
-                    judge={tempJudge}
-                    projects={judgeProjects}
-                    criteria={criteria}
-                    scores={judgeScores}
-                    onScoreSubmit={addOrUpdateScore}
-                    onScoreDelete={deleteScore}
-                />;
-            }
-            handleLogout();
-            return <p className="p-8 text-center text-red-500">Your judge profile was not found. You have been logged out.</p>
+            return <p className="p-8 text-center text-red-500">Your judge profile was not found. You may have been logged out.</p>
         }
         
         return <JudgeDashboard
@@ -317,12 +168,6 @@ function App() {
   return (
     <div className="bg-gray-50 min-h-screen font-sans">
       <Header user={user} onLogout={handleLogout} judges={judges} />
-      {backendError && (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 max-w-screen-xl mx-auto my-4 rounded-r-lg shadow-md" role="alert">
-          <p className="font-bold">Offline Mode</p>
-          <p>{backendError}</p>
-        </div>
-      )}
       <main className="max-w-screen-xl mx-auto">
         {renderContent()}
       </main>
