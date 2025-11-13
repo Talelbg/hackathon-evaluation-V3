@@ -16,7 +16,7 @@ function App() {
   const [scores, setScores] = useState<Score[]>([]);
 
   useEffect(() => {
-    // Load initial data from our "database" when the app starts
+    // Load initial data from the dbService (localStorage) when the app starts
     const fetchData = async () => {
         const data = await dbService.getAllData();
         setProjects(data.projects);
@@ -32,63 +32,69 @@ function App() {
   // --- Admin Handlers ---
   const addProjects = async (newProjectsData: Omit<Project, 'id'>[]) => {
       const createdProjects = await dbService.createProjects(newProjectsData);
-      setProjects(prev => [...prev, ...createdProjects]);
+      if(createdProjects) setProjects(prev => [...prev, ...createdProjects]);
   };
   const editProject = async (updatedProject: Project) => {
       const savedProject = await dbService.updateProject(updatedProject);
-      setProjects(prev => prev.map(p => p.id === savedProject.id ? savedProject : p));
+      if(savedProject) setProjects(prev => prev.map(p => p.id === savedProject.id ? savedProject : p));
   };
   const deleteProject = async (projectId: string) => {
-    await dbService.deleteProject(projectId);
-    setProjects(prev => prev.filter(p => p.id !== projectId));
-    setScores(prev => prev.filter(s => s.projectId !== projectId));
+    const result = await dbService.deleteProject(projectId);
+    if (result?.success) {
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      setScores(prev => prev.filter(s => s.projectId !== projectId));
+    }
   };
 
   const addJudge = async (newJudgeData: Omit<Judge, 'id'>) => {
     const newJudge = await dbService.createJudge(newJudgeData);
-    setJudges(prev => [...prev, newJudge]);
+    if (newJudge) setJudges(prev => [...prev, newJudge]);
     return newJudge;
   };
   const editJudge = async (updatedJudge: Judge) => {
       const savedJudge = await dbService.updateJudge(updatedJudge);
-      setJudges(prev => prev.map(j => j.id === savedJudge.id ? savedJudge : j));
+      if(savedJudge) setJudges(prev => prev.map(j => j.id === savedJudge.id ? savedJudge : j));
   };
   const deleteJudge = async (judgeId: string) => {
-    await dbService.deleteJudge(judgeId);
-    setJudges(prev => prev.filter(j => j.id !== judgeId));
-    setScores(prev => prev.filter(s => s.judgeId !== judgeId));
+    const result = await dbService.deleteJudge(judgeId);
+    if(result?.success) {
+      setJudges(prev => prev.filter(j => j.id !== judgeId));
+      setScores(prev => prev.filter(s => s.judgeId !== judgeId));
+    }
   };
 
   const addCriterion = async (newCriterionData: Omit<Criterion, 'id'>) => {
       const newCriterion = await dbService.createCriterion(newCriterionData);
-      setCriteria(prev => [...prev, newCriterion]);
+      if(newCriterion) setCriteria(prev => [...prev, newCriterion]);
   };
   const editCriterion = async (updatedCriterion: Criterion) => {
       const savedCriterion = await dbService.updateCriterion(updatedCriterion);
-      setCriteria(prev => prev.map(c => c.id === savedCriterion.id ? savedCriterion : c));
+      if(savedCriterion) setCriteria(prev => prev.map(c => c.id === savedCriterion.id ? savedCriterion : c));
   };
   const deleteCriterion = async (criterionId: string) => {
-    await dbService.deleteCriterion(criterionId);
-    setCriteria(prev => prev.filter(c => c.id !== criterionId));
+    const result = await dbService.deleteCriterion(criterionId);
+    if(result?.success) setCriteria(prev => prev.filter(c => c.id !== criterionId));
   };
 
   // --- Judge Handler ---
   const addOrUpdateScore = async (newScore: Score) => {
     const savedScore = await dbService.createOrUpdateScore(newScore);
-    setScores(prev => {
-        const index = prev.findIndex(s => s.id === savedScore.id);
-        if (index > -1) {
-            const updatedScores = [...prev];
-            updatedScores[index] = savedScore;
-            return updatedScores;
-        }
-        return [...prev, savedScore];
-    });
+    if (savedScore) {
+      setScores(prev => {
+          const index = prev.findIndex(s => s.id === savedScore.id);
+          if (index > -1) {
+              const updatedScores = [...prev];
+              updatedScores[index] = savedScore;
+              return updatedScores;
+          }
+          return [...prev, savedScore];
+      });
+    }
   };
   
   const deleteScore = async (scoreId: string) => {
-    await dbService.deleteScore(scoreId);
-    setScores(prev => prev.filter(s => s.id !== scoreId));
+    const result = await dbService.deleteScore(scoreId);
+    if(result?.success) setScores(prev => prev.filter(s => s.id !== scoreId));
   };
 
   const handleAdminLogin = () => setUser({ role: UserRole.ADMIN });
@@ -97,7 +103,11 @@ function App() {
     let finalJudgeId = judgeId;
     if (judgeId === 'new' && newJudgeData) {
       const newJudge = await addJudge(newJudgeData);
-      finalJudgeId = newJudge.id;
+      if (newJudge) {
+        finalJudgeId = newJudge.id;
+      } else {
+        return; // Don't log in if judge creation failed
+      }
     }
     setUser({ role: UserRole.JUDGE, id: finalJudgeId });
   };
@@ -123,7 +133,7 @@ function App() {
 
   const renderContent = () => {
     if (isLoading) {
-        return <div className="p-8 text-center">Loading platform data...</div>
+        return <div className="p-8 text-center">Loading Evaluation Platform...</div>
     }
 
     if (!user) {
