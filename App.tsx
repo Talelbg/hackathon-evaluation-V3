@@ -6,9 +6,18 @@ import AdminDashboard from './components/AdminDashboard';
 import JudgeDashboard from './components/JudgeDashboard';
 import Header from './components/Header';
 
+const BackendErrorBanner = () => (
+    <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 m-4" role="alert">
+        <p className="font-bold">Backend Connection Failed</p>
+        <p>Could not connect to the backend server. Please ensure it's running.</p>
+        <p className="text-sm mt-2 font-mono">Run: <code className="bg-yellow-200 p-1 rounded">cd backend &amp;&amp; npm install &amp;&amp; node server.js</code></p>
+    </div>
+);
+
 function App() {
   const [user, setUser] = useState<{ role: UserRole; id?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBackendError, setIsBackendError] = useState(false);
   
   const [projects, setProjects] = useState<Project[]>([]);
   const [judges, setJudges] = useState<Judge[]>([]);
@@ -16,30 +25,49 @@ function App() {
   const [scores, setScores] = useState<Score[]>([]);
 
   useEffect(() => {
-    // Load initial data from the dbService (localStorage) when the app starts
+    // Load initial data from the backend when the app starts
     const fetchData = async () => {
-        const data = await dbService.getAllData();
-        setProjects(data.projects);
-        setJudges(data.judges);
-        setCriteria(data.criteria);
-        setScores(data.scores);
-        setIsLoading(false);
+        try {
+            const data = await dbService.getAllData();
+            setProjects(data.projects);
+            setJudges(data.judges);
+            setCriteria(data.criteria);
+            setScores(data.scores);
+            setIsBackendError(false);
+        } catch (error) {
+            console.error("Failed to connect to backend:", error);
+            setIsBackendError(true);
+        } finally {
+            setIsLoading(false);
+        }
     };
     fetchData();
   }, []);
 
+  const handleApiCall = async <T,>(apiCall: () => Promise<T>): Promise<T | null> => {
+    try {
+        const result = await apiCall();
+        setIsBackendError(false);
+        return result;
+    } catch (error) {
+        console.error("API call failed:", error);
+        setIsBackendError(true);
+        return null;
+    }
+  };
+
 
   // --- Admin Handlers ---
   const addProjects = async (newProjectsData: Omit<Project, 'id'>[]) => {
-      const createdProjects = await dbService.createProjects(newProjectsData);
+      const createdProjects = await handleApiCall(() => dbService.createProjects(newProjectsData));
       if(createdProjects) setProjects(prev => [...prev, ...createdProjects]);
   };
   const editProject = async (updatedProject: Project) => {
-      const savedProject = await dbService.updateProject(updatedProject);
+      const savedProject = await handleApiCall(() => dbService.updateProject(updatedProject));
       if(savedProject) setProjects(prev => prev.map(p => p.id === savedProject.id ? savedProject : p));
   };
   const deleteProject = async (projectId: string) => {
-    const result = await dbService.deleteProject(projectId);
+    const result = await handleApiCall(() => dbService.deleteProject(projectId));
     if (result?.success) {
       setProjects(prev => prev.filter(p => p.id !== projectId));
       setScores(prev => prev.filter(s => s.projectId !== projectId));
@@ -47,16 +75,16 @@ function App() {
   };
 
   const addJudge = async (newJudgeData: Omit<Judge, 'id'>) => {
-    const newJudge = await dbService.createJudge(newJudgeData);
+    const newJudge = await handleApiCall(() => dbService.createJudge(newJudgeData));
     if (newJudge) setJudges(prev => [...prev, newJudge]);
     return newJudge;
   };
   const editJudge = async (updatedJudge: Judge) => {
-      const savedJudge = await dbService.updateJudge(updatedJudge);
+      const savedJudge = await handleApiCall(() => dbService.updateJudge(updatedJudge));
       if(savedJudge) setJudges(prev => prev.map(j => j.id === savedJudge.id ? savedJudge : j));
   };
   const deleteJudge = async (judgeId: string) => {
-    const result = await dbService.deleteJudge(judgeId);
+    const result = await handleApiCall(() => dbService.deleteJudge(judgeId));
     if(result?.success) {
       setJudges(prev => prev.filter(j => j.id !== judgeId));
       setScores(prev => prev.filter(s => s.judgeId !== judgeId));
@@ -64,21 +92,21 @@ function App() {
   };
 
   const addCriterion = async (newCriterionData: Omit<Criterion, 'id'>) => {
-      const newCriterion = await dbService.createCriterion(newCriterionData);
+      const newCriterion = await handleApiCall(() => dbService.createCriterion(newCriterionData));
       if(newCriterion) setCriteria(prev => [...prev, newCriterion]);
   };
   const editCriterion = async (updatedCriterion: Criterion) => {
-      const savedCriterion = await dbService.updateCriterion(updatedCriterion);
+      const savedCriterion = await handleApiCall(() => dbService.updateCriterion(updatedCriterion));
       if(savedCriterion) setCriteria(prev => prev.map(c => c.id === savedCriterion.id ? savedCriterion : c));
   };
   const deleteCriterion = async (criterionId: string) => {
-    const result = await dbService.deleteCriterion(criterionId);
+    const result = await handleApiCall(() => dbService.deleteCriterion(criterionId));
     if(result?.success) setCriteria(prev => prev.filter(c => c.id !== criterionId));
   };
 
   // --- Judge Handler ---
   const addOrUpdateScore = async (newScore: Score) => {
-    const savedScore = await dbService.createOrUpdateScore(newScore);
+    const savedScore = await handleApiCall(() => dbService.createOrUpdateScore(newScore));
     if (savedScore) {
       setScores(prev => {
           const index = prev.findIndex(s => s.id === savedScore.id);
@@ -93,7 +121,7 @@ function App() {
   };
   
   const deleteScore = async (scoreId: string) => {
-    const result = await dbService.deleteScore(scoreId);
+    const result = await handleApiCall(() => dbService.deleteScore(scoreId));
     if(result?.success) setScores(prev => prev.filter(s => s.id !== scoreId));
   };
 
@@ -133,46 +161,57 @@ function App() {
 
   const renderContent = () => {
     if (isLoading) {
-        return <div className="p-8 text-center">Loading Evaluation Platform...</div>
+        return <div className="p-8 text-center">Connecting to server...</div>
+    }
+
+    if (isBackendError && !user) {
+        return <BackendErrorBanner />;
     }
 
     if (!user) {
       return <LoginScreen onAdminLogin={handleAdminLogin} onJuryLogin={handleJuryLogin} judges={judges} />;
     }
 
-    switch (user.role) {
-      case UserRole.ADMIN:
-        return <AdminDashboard 
-            projects={projects} 
-            judges={judges} 
-            criteria={criteria} 
-            scores={scores}
-            addProjects={addProjects}
-            editProject={editProject}
-            deleteProject={deleteProject}
-            addJudge={addJudge}
-            editJudge={editJudge}
-            deleteJudge={deleteJudge}
-            addCriterion={addCriterion}
-            editCriterion={editCriterion}
-            deleteCriterion={deleteCriterion}
-        />;
-      case UserRole.JUDGE:
-        if (!judgeData) {
-            return <p className="p-8 text-center text-red-500">Your judge profile was not found. You may have been logged out.</p>
-        }
-        
-        return <JudgeDashboard
-            judge={judgeData.currentJudge}
-            projects={judgeData.judgeProjects}
-            criteria={criteria}
-            scores={judgeData.judgeScores}
-            onScoreSubmit={addOrUpdateScore}
-            onScoreDelete={deleteScore}
-        />;
-      default:
-        return null;
-    }
+    return (
+        <>
+            {isBackendError && <BackendErrorBanner />}
+            {(() => {
+                switch (user.role) {
+                case UserRole.ADMIN:
+                    return <AdminDashboard 
+                        projects={projects} 
+                        judges={judges} 
+                        criteria={criteria} 
+                        scores={scores}
+                        addProjects={addProjects}
+                        editProject={editProject}
+                        deleteProject={deleteProject}
+                        addJudge={addJudge}
+                        editJudge={editJudge}
+                        deleteJudge={deleteJudge}
+                        addCriterion={addCriterion}
+                        editCriterion={editCriterion}
+                        deleteCriterion={deleteCriterion}
+                    />;
+                case UserRole.JUDGE:
+                    if (!judgeData) {
+                        return <p className="p-8 text-center text-red-500">Your judge profile was not found. You may have been logged out.</p>
+                    }
+                    
+                    return <JudgeDashboard
+                        judge={judgeData.currentJudge}
+                        projects={judgeData.judgeProjects}
+                        criteria={criteria}
+                        scores={judgeData.judgeScores}
+                        onScoreSubmit={addOrUpdateScore}
+                        onScoreDelete={deleteScore}
+                    />;
+                default:
+                    return null;
+                }
+            })()}
+        </>
+    );
   };
 
   return (
